@@ -1,0 +1,13 @@
+{
+  "engine": "trocr",
+  "page_index": 5,
+  "pdf": "C:\\python_project\\Real_project\\Market-Plan-B-AI\\20251103_company_899552000.pdf",
+  "dpi": 400,
+  "elapsed_ms": 1843.3,
+  "device": "cpu",
+  "text": "***",
+  "lines": [
+    "***"
+  ],
+  "count": 1
+}

@@ -1,4 +1,4 @@
-# ocr_runner.py — 최종 안정화 통합본
+# ocr_runner.py — 최종 안정화본 (TrOCR CPU 기본, ChartOCR 전처리/JSON, 모든 엔진 JSON/TXT 저장)
 from __future__ import annotations
 import os, time, json, logging, argparse
 from dataclasses import dataclass
@@ -13,9 +13,8 @@ import fitz  # PyMuPDF
 try:
     import pynvml
     pynvml.nvmlInit()
-    _NV_OK = True
 except Exception:
-    _NV_OK = False
+    pass
 
 LOGGER = logging.getLogger("ocr_runner")
 if not LOGGER.handlers:
@@ -72,11 +71,18 @@ def preprocess(img_bgr: np.ndarray, cfg: PreprocConfig) -> np.ndarray:
         img_bgr = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
     return img_bgr
 
-# 차트 전용 전처리(라벨/축/범례 강화)
+# 차트 전용 전처리(라벨/축/범례 강화) + 최대 변 캡(3800px)
 def preprocess_chart(img_bgr: np.ndarray) -> np.ndarray:
     h, w = img_bgr.shape[:2]
-    scale = 1.7
+    scale = 1.6  # 과대확대 방지(기본 1.6)
     img = cv2.resize(img_bgr, (int(w*scale), int(h*scale)), interpolation=cv2.INTER_CUBIC)
+
+    # 최대 변 제한(내부 자동 리사이즈 전에 선제적으로)
+    max_side = max(img.shape[:2])
+    if max_side > 3800:
+        r = 3800 / max_side
+        new_w, new_h = int(img.shape[1]*r), int(img.shape[0]*r)
+        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8,8))
@@ -104,11 +110,10 @@ class BaseEngine:
     def ocr_text(self, img_bgr: np.ndarray) -> str:
         raise NotImplementedError
     def ocr_json(self, img_bgr: np.ndarray) -> Dict[str, Any]:
-        """엔진별 JSON 형태 출력을 원하면 오버라이드. 기본은 텍스트만."""
         return {"engine": self.name, "text": self.ocr_text(img_bgr)}
 
 # =========================
-# 3) PaddleOCR (예: 문서/한글)
+# 3) PaddleOCR
 # =========================
 try:
     from paddleocr import PaddleOCR
@@ -155,7 +160,14 @@ class PaddleTextEngine(BaseEngine):
     def __init__(self, lang: str = "korean", debug: bool = False):
         if PaddleOCR is None:
             raise RuntimeError("paddleocr not installed")
-        self.client = PaddleOCR(lang=lang)
+        # 일부 버전 파라미터 호환
+        try:
+            self.client = PaddleOCR(lang=lang, det_limit_side_len=5000)
+        except TypeError:
+            try:
+                self.client = PaddleOCR(lang=lang, det_max_side_len=5000)
+            except TypeError:
+                self.client = PaddleOCR(lang=lang)
         self._use_predict = hasattr(self.client, "predict")
         self.debug = debug
 
@@ -169,7 +181,7 @@ class PaddleTextEngine(BaseEngine):
     def ocr_text(self, img_bgr: np.ndarray) -> str:
         res = self._run(img_bgr)
         if self.debug:
-            _save_json("./ocr_results/_debug/paddle_raw_%d.json" % int(time.time()*1000), {"raw": res})
+            _save_json("./ocr_results/_debug/paddle_internal/paddle_raw_%d.json" % int(time.time()*1000), {"raw": res})
         texts = _extract_texts_from_paddle(res)
         return "\n".join(texts)
 
@@ -179,40 +191,52 @@ class PaddleTextEngine(BaseEngine):
         return {"engine": self.name, "lines": lines, "count": len(lines)}
 
 # =========================
-# 4) TrOCR (Transformers, GPU→CPU 자동 폴백, JSON 저장)
+# 4) TrOCR (CPU 기본, CUDA 강제 시 폴백)
 # =========================
 class TrOCREngine(BaseEngine):
     name = "trocr"
     def __init__(self, model_name="microsoft/trocr-base-printed", device: Optional[str] = None, fp16: bool = False, debug: bool = False):
         from transformers import TrOCRProcessor, VisionEncoderDecoderModel
         import torch
-        # 'use_fast' 경고 사전 억제용(일부 버전에서 인자 미지원 가능성 대비)
+        self.debug = debug
+
+        # 프로세서
         try:
             self.processor = TrOCRProcessor.from_pretrained(model_name, use_fast=True)
         except TypeError:
             self.processor = TrOCRProcessor.from_pretrained(model_name)
 
+        # 모델 로드
         self.model = VisionEncoderDecoderModel.from_pretrained(model_name)
-        self.debug = debug
 
+        # 기본은 CPU (RTX 50xx 미지원 회피)
+        self.device = "cpu"
+
+        # 환경변수로 CUDA 강제 시도 가능: TROCR_DEVICE=cuda
+        env_dev = os.environ.get("TROCR_DEVICE", "").lower()
         if device:
-            self.device = device
+            env_dev = device.lower()
+        if env_dev == "cuda":
+            try:
+                if torch.cuda.is_available():
+                    # 커널 불일치 대비: 간단한 텐서 이동으로 사전 검증
+                    _ = torch.zeros(1, device="cuda")
+                    self.model.to("cuda")
+                    if fp16:
+                        try:
+                            self.model.half()
+                        except Exception as e:
+                            LOGGER.warning(f"FP16 변환 실패: {e} → FP32 유지")
+                    self.device = "cuda"
+                    LOGGER.info("TrOCR: CUDA 사용 모드로 초기화되었습니다.")
+                else:
+                    LOGGER.warning("CUDA 사용 불가 → CPU로 전환합니다.")
+                    self.model.to("cpu")
+            except Exception as e:
+                LOGGER.warning(f"CUDA 초기화 실패({e}) → CPU로 전환합니다.")
+                self.model.to("cpu")
         else:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        try:
-            self.model.to(self.device)
-            if fp16 and self.device == "cuda":
-                try:
-                    self.model.half()
-                except Exception as e:
-                    LOGGER.warning(f"⚠️ FP16 변환 실패: {e} → CPU로 전환합니다.")
-                    self.device = "cpu"
-                    self.model.to(self.device)
-        except Exception as e:
-            LOGGER.warning(f"⚠️ GPU 초기화 실패 ({e}) → CPU로 전환합니다.")
-            self.device = "cpu"
-            self.model.to(self.device)
+            self.model.to("cpu")
 
         self.torch = torch
 
@@ -220,7 +244,6 @@ class TrOCREngine(BaseEngine):
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         pil = Image.fromarray(img_rgb)
         pixel_values = self.processor(images=pil, return_tensors="pt").pixel_values.to(self.device)
-        # 품질 안정화를 위한 기본 빔서치
         with self.torch.no_grad():
             generated_ids = self.model.generate(
                 pixel_values,
@@ -233,17 +256,15 @@ class TrOCREngine(BaseEngine):
         return text
 
     def ocr_text(self, img_bgr: np.ndarray) -> str:
-        text = self._gen(img_bgr)
-        return text
+        return self._gen(img_bgr)
 
     def ocr_json(self, img_bgr: np.ndarray) -> Dict[str, Any]:
         text = self._gen(img_bgr)
-        # 라인 분해(후처리)
-        lines = [t for t in text.splitlines() if t.strip()] if text else []
-        return {"engine": self.name, "text": text, "lines": lines, "count": len(lines), "device": self.device}
+        lines = [t for t in (text or "").splitlines() if t.strip()]
+        return {"engine": self.name, "device": self.device, "text": text, "lines": lines, "count": len(lines)}
 
 # =========================
-# 5) ChartOCR (차트 특화 전처리 + kor→en 폴백 + JSON 저장)
+# 5) ChartOCR (차트 특화 전처리 + kor→en 폴백 + JSON)
 # =========================
 class ChartTextEngine(BaseEngine):
     name = "chartocr"
@@ -265,6 +286,12 @@ class ChartTextEngine(BaseEngine):
             lines_eng = [t for t in text_eng.splitlines() if t.strip()]
 
         final = lines_kor if len(lines_kor) >= len(lines_eng) else lines_eng
+        # 디버그 저장
+        if self.debug:
+            _save_json("./ocr_results/_debug/chartocr_raw_%d.json" % int(time.time()*1000), {
+                "engine": "chartocr", "picked": "kor" if len(lines_kor) >= len(lines_eng) else "en",
+                "lines_kor": lines_kor, "lines_eng": lines_eng, "lines_final": final,
+            })
         return "\n".join(final)
 
     def ocr_json(self, img_bgr: np.ndarray) -> Dict[str, Any]:
@@ -287,7 +314,7 @@ class ChartTextEngine(BaseEngine):
             "picked": picked,
             "lines_kor": lines_kor,
             "lines_eng": lines_eng,
-            "lines_final": final,
+            "lines": final,
             "count": len(final)
         }
 
@@ -307,7 +334,7 @@ class BaseEngineFactory:
             if n in ("paddle", "paddleocr"):
                 engines["paddleocr"] = PaddleTextEngine(lang="korean", debug=self.debug)
             elif n in ("trocr",):
-                # fp16=False 기본화(충돌 방지); 내부에서 자동 폴백
+                # CPU 기본, 환경변수/TROCR_DEVICE=cuda로 강제 가능(실패 시 CPU 폴백)
                 engines["trocr"] = TrOCREngine(device=self.device_hint or None, fp16=False, debug=self.debug)
             elif n in ("chart", "chartocr"):
                 engines["chartocr"] = ChartTextEngine(lang="korean", debug=self.debug)
@@ -334,6 +361,7 @@ def run_ocr(pdf_path: str, out_dir: str, dpi: int, engine_names: List[str], debu
     os.makedirs(out_dir, exist_ok=True)
     if debug:
         os.makedirs(os.path.join(out_dir, "_debug"), exist_ok=True)
+        os.makedirs(os.path.join(out_dir, "_debug", "paddle_internal"), exist_ok=True)
 
     try:
         doc = fitz.open(pdf_path)
@@ -364,7 +392,6 @@ def run_ocr(pdf_path: str, out_dir: str, dpi: int, engine_names: List[str], debu
             LOGGER.info(f"  - Running engine: {name}")
             t0 = time.time()
             try:
-                # 모든 엔진은 공통 JSON을 우선 받는다
                 result_json = eng.ocr_json(img_proc)
                 text = "\n".join(result_json.get("lines", [])) if "lines" in result_json else result_json.get("text", "")
             except Exception as e:
@@ -383,7 +410,7 @@ def run_ocr(pdf_path: str, out_dir: str, dpi: int, engine_names: List[str], debu
             except Exception as e:
                 LOGGER.error(f"Failed to write TXT: {e}")
 
-            # JSON 저장 (페이지별/엔진별 표준화)
+            # JSON 저장
             out_json = os.path.join(out_dir, f"{item_id}__{name}.json")
             try:
                 standard = {

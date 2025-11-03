@@ -1,0 +1,13 @@
+{
+  "engine": "trocr",
+  "page_index": 1,
+  "pdf": "C:\\python_project\\Real_project\\Market-Plan-B-AI\\20251103_company_899552000.pdf",
+  "dpi": 400,
+  "elapsed_ms": 2133.0,
+  "device": "cpu",
+  "text": "CASHIER ***",
+  "lines": [
+    "CASHIER ***"
+  ],
+  "count": 1
+}
