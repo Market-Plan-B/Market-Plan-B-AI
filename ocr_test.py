@@ -94,9 +94,9 @@ def main():
         print(f"[warn] onnxruntime-gpu 설치 실패(선택 항목): {e}")
 
     # -----------------------------
-    # 6) 벤치마크 스크립트 & 라벨 템플릿 생성
+    # 6) OCR 실행 스크립트 생성
     # -----------------------------
-    bench_code = r"""
+    ocr_runner_code = r'''
 from __future__ import annotations
 import os, io, time, json, csv, math, argparse, hashlib, tempfile, logging
 from dataclasses import dataclass
@@ -106,8 +106,6 @@ import numpy as np
 import cv2
 from PIL import Image
 import fitz  # PyMuPDF
-from pypdf import PdfReader
-from rapidfuzz.distance import Levenshtein
 
 # GPU mem probe (optional)
 try:
@@ -117,12 +115,12 @@ try:
 except Exception:
     _NV_OK = False
 
-LOGGER = logging.getLogger("ocr_bench")
+LOGGER = logging.getLogger("ocr_run")
 if not LOGGER.handlers:
     h = logging.StreamHandler()
     h.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s - %(message)s"))
     LOGGER.addHandler(h)
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.INFO) # Default to INFO, can be overridden by --debug
 
 @dataclass
 class PreprocConfig:
@@ -155,6 +153,7 @@ def preprocess(img_bgr: np.ndarray, cfg: PreprocConfig) -> np.ndarray:
     if cfg.deskew:
         angle = _estimate_skew_angle(gray)
         if abs(angle) > 0.1:
+            LOGGER.debug(f"Deskewing image by {angle:.2f} degrees.")
             img_bgr = _rotate(img_bgr, angle)
             gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     if cfg.clahe:
@@ -186,11 +185,22 @@ class PaddleTextEngine(BaseEngine):
                                 use_gpu=use_gpu, rec_batch_num=rec_batch_num)
     def ocr_text(self, img_bgr: np.ndarray) -> str:
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        res = self.client.ocr(img_rgb)
+        res = self.client.ocr(img_rgb, cls=True)
+        LOGGER.debug(f"PaddleOCR raw result: {res}")
+        
+        if not res or not res[0]:
+            LOGGER.warning("PaddleOCR returned no result for this page.")
+            return ""
+        
         texts = []
-        for line in (res[0] or []):
-            _pts, (txt, score) = line
-            if txt: texts.append(txt.strip())
+        for line in res[0]:
+            if line and len(line) == 2:
+                txt, score = line[1]
+                if txt:
+                    texts.append(txt.strip())
+                    LOGGER.debug(f'  - Detected text: "{txt.strip()}" with confidence {score:.2f}')
+            else:
+                LOGGER.warning(f"Unexpected line format from PaddleOCR: {line}")
         return "\n".join(texts)
 
 # TrOCR
@@ -213,6 +223,7 @@ class TrOCREngine(BaseEngine):
         with self.torch.no_grad():
             generated_ids = self.model.generate(pixel_values, max_length=512)
         text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        LOGGER.debug(f'TrOCR detected text: "{text}'')
         return text
 
 # Chart OCR (text only)
@@ -223,170 +234,105 @@ class ChartTextEngine(BaseEngine):
     def ocr_text(self, img_bgr: np.ndarray) -> str:
         return self.inner.ocr_text(img_bgr)
 
-def load_image_or_pdf(src: str, dpi: int = 240) -> np.ndarray:
-    if ".pdf" in src.lower():
-        if "#" not in src:
-            page_index = 0; pdf_path = src
-        else:
-            pdf_path, page_str = src.split("#", 1); page_index = int(page_str)
-        with fitz.open(pdf_path) as doc:
-            page = doc[page_index]
-            pix = page.get_pixmap(dpi=dpi)
-            img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
-            if pix.n == 4: img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
-            return img.copy()
-    else:
-        img = cv2.imread(src, cv2.IMREAD_COLOR)
-        if img is None: raise FileNotFoundError(f"Cannot read image: {src}")
-        return img
-
-def normalize_text(s: str) -> str:
-    s = s.replace("\u200b","").replace("\xa0"," ").strip()
-    s = "\n".join(line.strip() for line in s.splitlines() if line.strip())
-    return s
-
-def cer(ref: str, hyp: str) -> float:
-    ref, hyp = normalize_text(ref), normalize_text(hyp)
-    if not ref and not hyp: return 0.0
-    if not ref: return float(len(hyp))
-    return Levenshtein.distance(ref, hyp) / max(1, len(ref))
-
-def wer(ref: str, hyp: str) -> float:
-    ref = normalize_text(ref).split()
-    hyp = normalize_text(hyp).split()
-    if not ref and not hyp: return 0.0
-    if not ref: return float(len(hyp))
-    return Levenshtein.distance(" ".join(ref), " ".join(hyp)) / max(1, len(" ".join(ref)))
-
-def gpu_mem_mb() -> int | None:
-    try:
-        h = pynvml.nvmlDeviceGetHandleByIndex(0)
-        mem = pynvml.nvmlDeviceGetMemoryInfo(h)
-        return int(mem.used / (1024*1024))
-    except Exception:
-        return None
-
 class BaseEngineFactory:
     def __init__(self, names: list[str], device_hint: str | None = None):
         self.names = [n.lower() for n in names]
         self.device_hint = device_hint
     def build(self):
         engines = {}
+        LOGGER.info(f"Building engines: {self.names}")
         for n in self.names:
             if n in ("paddle","paddleocr"):
-                engines["paddleocr"] = PaddleTextEngine(lang="korean", use_gpu=True)
+                engines["paddleocr"] = PaddleTextEngine(lang="korean", use_gpu=True, show_log=False)
             elif n in ("trocr",):
                 engines["trocr"] = TrOCREngine(device=self.device_hint or None, fp16=True)
             elif n in ("chart","chartocr"):
-                engines["chartocr"] = ChartTextEngine(lang="korean", use_gpu=True)
+                engines["chartocr"] = ChartTextEngine(lang="korean", use_gpu=True, show_log=False)
             else:
                 raise ValueError(f"Unknown engine: {n}")
+        LOGGER.info(f"Engines built: {list(engines.keys())}")
         return engines
 
-def run_benchmark(dataset_path: str, out_dir: str, dpi: int, engine_names: list[str]):
+def run_ocr(pdf_path: str, out_dir: str, dpi: int, engine_names: list[str]):
     os.makedirs(out_dir, exist_ok=True)
-    with open(dataset_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    items = data.get("items", [])
+    
+    try:
+        LOGGER.debug(f"Opening PDF: {pdf_path}")
+        doc = fitz.open(pdf_path)
+        num_pages = len(doc)
+    except Exception as e:
+        LOGGER.error(f"Failed to open PDF {pdf_path}: {e}")
+        return
+
+    pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
     engines = BaseEngineFactory(engine_names).build()
 
-    csv_path = os.path.join(out_dir, "results.csv")
-    with open(csv_path, "w", encoding="utf-8", newline="") as cf:
-        import csv as _csv
-        writer = _csv.writer(cf)
-        writer.writerow(["id","type","engine","latency_ms","gpu_mem_mb","cer","wer"])
-
-    for it in items:
-        item_id = it["id"]; typ = it["type"]; src = it["source"]; gt = it.get("gt_text","")
-        LOGGER.info(f"Item {item_id} ({typ}) - {src}")
+    for page_num in range(num_pages):
+        item_id = f"{pdf_name}_p{page_num}"
+        LOGGER.info(f"Processing Page {page_num + 1}/{num_pages} of {pdf_path}")
+        
         try:
-            img = load_image_or_pdf(src, dpi=dpi)
+            page = doc[page_num]
+            pix = page.get_pixmap(dpi=dpi)
+            img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
+            if pix.n == 4: img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+            img = img.copy()
         except Exception as e:
-            LOGGER.error(f"Failed to load {src}: {e}"); continue
+            LOGGER.error(f"Failed to load page {page_num} from {pdf_path}: {e}"); continue
 
-        img_proc = preprocess(img, PreprocConfig())
+        img_proc = preprocess(img, PreprocConfig(target_dpi=dpi))
 
         for name, eng in engines.items():
-            before_mem = gpu_mem_mb()
+            LOGGER.info(f"  - Running engine: {name}")
             t0 = time.time()
             try:
                 text = eng.ocr_text(img_proc)
             except Exception as e:
-                LOGGER.error(f"{name} failed on {item_id}: {e}"); text = ""
+                LOGGER.error(f"    Engine {name} failed on {item_id}: {e}", exc_info=True); text = f"ERROR: {e}"
             latency_ms = (time.time() - t0) * 1000
-            after_mem = gpu_mem_mb()
-            used_mb = (None if (before_mem is None or after_mem is None) else max(0, after_mem - before_mem))
+            LOGGER.info(f"    Engine {name} finished in {latency_ms:.1f} ms")
 
-            c = cer(gt, text); w = wer(gt, text)
-            dump = {
-                "id": item_id, "type": typ, "engine": name,
-                "source": src, "gt": gt, "pred": text,
-                "metrics": {"cer": c, "wer": w, "latency_ms": latency_ms, "gpu_mem_mb": used_mb}
-            }
-            with open(os.path.join(out_dir, f"{item_id}__{name}.json"), "w", encoding="utf-8") as jf:
-                json.dump(dump, jf, ensure_ascii=False, indent=2)
+            output_filename = os.path.join(out_dir, f"{item_id}__{name}.txt")
+            try:
+                with open(output_filename, "w", encoding="utf-8") as f:
+                    f.write(text)
+                LOGGER.info(f"    Result saved to {output_filename}")
+            except Exception as e:
+                LOGGER.error(f"    Failed to write output file {output_filename}: {e}")
 
-            with open(csv_path, "a", encoding="utf-8", newline="") as cf:
-                import csv as _csv
-                writer = _csv.writer(cf)
-                writer.writerow([item_id, typ, name, f"{latency_ms:.1f}", used_mb if used_mb is not None else "", f"{c:.4f}", f"{w:.4f}"])
-
-    LOGGER.info(f"Done. See CSV: {csv_path}")
+    doc.close()
+    LOGGER.info(f"Done. All pages processed. Results are in {out_dir}")
 
 def _cli():
     import argparse
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset", required=True, help="Path to labels.json")
-    ap.add_argument("--out_dir", default="./benchmark_out")
-    ap.add_argument("--dpi", type=int, default=240)
-    ap.add_argument("--engine", nargs="+", default=["paddleocr","trocr","chart"])
+    ap = argparse.ArgumentParser(description="Run OCR on a PDF file and save results.")
+    ap.add_argument("--pdf", required=True, help="Path to the PDF file to process.")
+    ap.add_argument("--out_dir", default="./ocr_results", help="Directory to save OCR output files.")
+    ap.add_argument("--dpi", type=int, default=240, help="DPI for rendering PDF pages.")
+    ap.add_argument("--engine", nargs="+", default=["paddleocr", "trocr"], help="OCR engine(s) to use.")
+    ap.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = ap.parse_args()
-    run_benchmark(args.dataset, args.out_dir, args.dpi, args.engine)
+
+    if args.debug:
+        LOGGER.setLevel(logging.DEBUG)
+
+    run_ocr(args.pdf, args.out_dir, args.dpi, args.engine)
 
 if __name__ == "__main__":
     _cli()
-"""
-    (SELF_DIR / "ocr_benchmark.py").write_text(bench_code, encoding="utf-8")
-
-    labels = {
-        "items": [
-            {
-                "id": "sample_doc_p0",
-                "type": "text",
-                "source": "path/to/your.pdf#0",
-                "gt_text": "여기에 0페이지의 정답 텍스트(요약 또는 단락) 일부를 넣으세요."
-            },
-            {
-                "id": "sample_chart_img",
-                "type": "chart_text",
-                "source": "path/to/chart.png",
-                "gt_text": "x-axis: Year, y-axis: Revenue ..."
-            },
-            {
-                "id": "sample_table_p2",
-                "type": "table_text",
-                "source": "path/to/your.pdf#2",
-                "gt_text": "표를 CSV 형태로 줄 단위로 붙여 넣어도 됩니다."
-            }
-        ]
-    }
-    (SELF_DIR / "labels_template.json").write_text(json.dumps(labels, ensure_ascii=False, indent=2), encoding="utf-8")
+'''
+    (SELF_DIR / "ocr_runner.py").write_text(ocr_runner_code, encoding="utf-8")
 
     print("\n[완료] 의존성 설치 & 스크립트 생성을 마쳤습니다.\n")
-    print(f" - 생성: {SELF_DIR / 'ocr_benchmark.py'}")
-    print(f" - 생성: {SELF_DIR / 'labels_template.json'}")
+    print(f" - 생성: {SELF_DIR / 'ocr_runner.py'}")
     print("\n다음 단계를 진행하세요:")
-    print("1) labels_template.json을 복사해 labels.json을 만들고, 각 항목의 source/gt_text를 채웁니다.")
-    print("2) 벤치마크 실행 예시:")
-    print("   python ocr_benchmark.py --dataset /절대경로/labels.json --out_dir ./benchmark_out --dpi 240 --engine paddleocr trocr chart")
-    print("3) 결과는 benchmark_out/results.csv와 per-item JSON으로 저장됩니다.")
-    print("\n튜닝 팁:")
-    print(" - DPI 220/240/300을 바꿔가며 CER/WER과 latency를 비교하세요.")
-    print(" - PaddleOCR는 rec_batch_num=12~16 권장, 한국어 lang='korean'.")
-    print(" - 차트는 텍스트 정확도만 평가합니다(데이터 복원은 별도 모델 필요).")
-    print("\n[추가 참고/FAQ]")
-    print(" - Paddle GPU 설치 오류 시: OS/CUDA별 전용 휠 인덱스 사용 또는 Docker 권장.")
-    print(" - PyTorch CUDA 오류 시: --index-url을 cu121/cu124로 교체 시도, 드라이버를 최신으로 유지하세요.")
-    print(" - Windows에서 VC++ 런타임 부족 오류 시 'Microsoft C++ Redistributable' 설치 후 재시도.")
+    print("1) 아래 명령어를 사용하여 ocr_runner.py를 실행합니다.")
+    print("   python ocr_runner.py --pdf /절대경로/파일명.pdf --engine paddleocr --debug")
+    print("\n   - --pdf: OCR을 적용할 PDF 파일의 절대 경로")
+    print("   - --engine: 사용할 OCR 엔진")
+    print("   - --debug: 실행 과정의 상세 로그를 출력합니다.")
+    print("\n2) 결과는 이전과 동일하게 ocr_results/ 폴더에 저장됩니다.")
+    print("3) 문제가 계속되면 --debug 플래그로 실행한 후 콘솔에 출력되는 전체 로그를 알려주세요.")
+
 if __name__ == "__main__":
     main()

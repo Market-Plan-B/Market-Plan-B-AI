@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "sample_doc_p0",
+      "type": "text",
+      "source": "path/to/your.pdf#0",
+      "gt_text": "여기에 0페이지의 정답 텍스트(요약 또는 단락) 일부를 넣으세요."
+    },
+    {
+      "id": "sample_chart_img",
+      "type": "chart_text",
+      "source": "path/to/chart.png",
+      "gt_text": "x-axis: Year, y-axis: Revenue ..."
+    },
+    {
+      "id": "sample_table_p2",
+      "type": "table_text",
+      "source": "path/to/your.pdf#2",
+      "gt_text": "표를 CSV 형태로 줄 단위로 붙여 넣어도 됩니다."
+    }
+  ]
+}

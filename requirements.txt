@@ -1,0 +1,28 @@
+# OCR Benchmark Dependencies
+
+# --- Core Libraries ---
+opencv-python
+pillow
+pymupdf
+pypdf
+rapidfuzz
+pynvml
+transformers
+accelerate
+paddleocr>=3.0.1
+
+# --- Deep Learning Frameworks (Manual Installation Recommended) ---
+# The following packages are required but are best installed manually
+# to match your system's CUDA version for GPU support.
+# The ocr_test.py script attempts to install them automatically.
+
+# PyTorch (example for CUDA 12.4)
+# torch
+# torchvision
+# torchaudio
+
+# PaddlePaddle (example for GPU)
+# paddlepaddle-gpu==3.2.0
+
+# ONNX Runtime (optional for GPU)
+# onnxruntime-gpu
