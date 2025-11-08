@@ -1,0 +1,50 @@
+# 🐍 Python / Virtual Environment
+venv/
+.env/
+*.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+
+# 📦 IDE / Editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 📊 Data / Output
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.h5
+*.db
+*.sqlite
+*.json
+*.log
+/data/
+outputs/
+notebooks/.ipynb_checkpoints/
+
+# 🧪 Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# 🧰 OS / Misc
+.DS_Store
+Thumbs.db
+
+# 🔑 Secrets / Keys
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+
+# 🧩 Build / Distribution
+build/
+dist/
+*.egg-info/
