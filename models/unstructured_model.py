@@ -9,7 +9,7 @@ from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
 
 
-REPO_DIR = "app/repository"
+REPO_DIR = "app/repository/unstructured_params"
 PARAM_PATTERN = "unstructure_model_tensor_fwd_*.npz"
 
 
