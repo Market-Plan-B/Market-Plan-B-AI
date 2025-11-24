@@ -1,4 +1,4 @@
-from typing import List
+
 import numpy as np
 import pandas as pd
 
@@ -26,14 +26,14 @@ def unstructure_refine(df: pd.DataFrame) -> pd.DataFrame:
     A_fwd, cluster_cols, H, used_path, target_col = load_latest_forward_params()
 
     # 2) cluster_* 존재 여부 체크
-    missing: List[str] = [c for c in cluster_cols if c not in df.columns]
+    missing: list[str] = [c for c in cluster_cols if c not in df.columns]
     if missing:
         raise ValueError(f"다음 cluster 컬럼이 없습니다: {missing}")
 
     # 3) raw cluster 행렬 (오늘 기준)
     C = df[cluster_cols].astype(float)
     C = C.replace([np.inf, -np.inf], np.nan).fillna(0.0)
-    C = C.values  # (N, K)
+    C = C.values  
 
     N, K = C.shape
     if K != A_fwd.shape[0]:
