@@ -657,41 +657,45 @@ reportgenerator_prompt = {
     "role": reportgenerator_Role,
     "rules": reportgenerator_Rules,
     "input_variables": [
-        "report_date",
-        "structured_data",
-        "news_items",
-        "model_prediction",
-        "xai_result",
-        "precomputed_strategies",
-    ],
+      "role",
+      "rules",
+      "output_schema",
+      "fewshot",
+      "report_date",
+      "structured_data",
+      "news_items",
+      "model_prediction",
+      "xai_result",
+      "precomputed_strategies",
+  ],
     "chain_of_thought": reportgenerator_chainofThought,
     "fewshot": reportgenerator_fewshot,
     "output_schema": reportgenerator_OutputSchema,
     "template": r"""
-{{role}}
+{role}
 
-{{rules}}
+{rules}
 
-{{output_schema}}
+{output_schema}
 
 [입력]
 report_date: 리포트 기준일 (예: 2025-11-19)
-{{report_date}}
+{report_date}
 
 structured_data: 해당 일자의 원유·정제 관련 정형 데이터 (Brent/WTI, 제품 크랙, 정제 마진 관련 지표, 스프레드 등)
-{{structured_data}}
+{structured_data}
 
 news_items: 당일 관련 뉴스 목록 (제목, 내용 요약, 감성/신뢰도 등)
-{{news_items}}
+{news_items}
 
 model_prediction: 익일 Brent 예상수익률 및 예상 종가 등 예측 결과
-{{model_prediction}}
+{model_prediction}
 
 xai_result: 모델이 중요하게 본 상위 변수 및 기여 방향
-{{xai_result}}
+{xai_result}
 
 precomputed_strategies: 사전에 계산된 정제 운영·조달·기획 관점 대응 전략 초안 2~3개
-{{precomputed_strategies}}
+{precomputed_strategies}
 
 [작성 지시]
 - 위의 [출력 형식(HTML)]에 정의된 구조를 따르는 **완전한 HTML 문서**만 출력하십시오.
@@ -702,7 +706,7 @@ precomputed_strategies: 사전에 계산된 정제 운영·조달·기획 관점
 - chain_of_thought 내용은 최종 출력에 포함하지 말고, HTML 리포트 본문만 출력하십시오.
 
 [참고 예시]
-{{fewshot}}
+{fewshot}
 """
 }
 
@@ -959,6 +963,10 @@ actiongenerator_prompt = {
     "role": actiongenerator_Role,
     "rules": actiongenerator_Rules,
     "input_variables": [
+        "role",
+        "rules",
+        "output_schema",
+        "fewshot",
         "report_date",
         "structured_data",
         "news_items",
@@ -969,27 +977,27 @@ actiongenerator_prompt = {
     "fewshot": actiongenerator_fewshot,
     "output_schema": actiongenerator_OutputSchema,
     "template": r"""
-{{role}}
+{role}
 
-{{rules}}
+{rules}
 
-{{output_schema}}
+{output_schema}
 
 [입력]
 report_date:
-{{report_date}}
+{report_date}
 
 structured_data:
-{{structured_data}}
+{structured_data}
 
 news_items:
-{{news_items}}
+{news_items}
 
 model_prediction:
-{{model_prediction}}
+{model_prediction}
 
 xai_result:
-{{xai_result}}
+{xai_result}
 
 [작성 지시]
 - 위의 [출력 형식(JSON)]을 정확히 따르는 **유효한 JSON**만 출력하십시오. 그 외 설명 문구는 출력하지 마십시오.
@@ -999,7 +1007,8 @@ xai_result:
 - 모든 텍스트는 한국어 존댓말로 작성하고, 투자 조언이 아니라 경영지원/정제 운영 관점의 리스크 인사이트 + 대응전략으로 한정하십시오.
 
 [참고 예시]
-{{fewshot}}
+{fewshot}
 """
 }
+
 
