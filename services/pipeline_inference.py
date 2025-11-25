@@ -16,6 +16,7 @@ def predict_next_day(df, model, scaler, seq_len=30, target_col="brent_ret_5d"):
     """
     df: 전체 feature dataframe
     """
+    print(df.head())  # 확인용 제거 해야함
     # return 컬럼 제거 (훈련과 동일 로직)
     ret_cols = [c for c in df.columns if "ret_" in c and c != target_col]
     df_input = df.drop(columns=ret_cols + ["brent_close", "wti_close"], errors="ignore")

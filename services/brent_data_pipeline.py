@@ -20,7 +20,7 @@ def make_brent_wti_features(start="2013-09-01", end=None, target_horizon=1):
 
     # Returns (미래 정보 포함 가능성 있음 → 뒤에서 필터링)
     # df["brent_ret_1d"]  = df["brent_close"].pct_change(1)
-    # df["brent_ret_5d"]  = df["brent_close"].pct_change(5)
+    df["brent_ret_5d"]  = df["brent_close"].pct_change(5)
     # df["brent_ret_20d"] = df["brent_close"].pct_change(20)
 
     # df["wti_ret_1d"]  = df["wti_close"].pct_change(1)
@@ -89,6 +89,7 @@ def build_full_dataset(
     # 1. 정형 데이터
     # -----------------------------------------
     df = make_brent_wti_features(start=start, end=end, target_horizon=target_horizon)
+    print(df.head())
     df["date"] = df.index.date   # merge 편하게 date 컬럼 추가
 
     # -----------------------------------------
