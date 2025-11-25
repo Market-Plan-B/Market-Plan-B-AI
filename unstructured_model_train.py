@@ -1,8 +1,8 @@
-# app/train_unstructured_forward_main.py
+# ./train_unstructured_forward_main.py
 
 import pandas as pd
-from app.services.unstructured_build import build_full_dataset
-from app.models.unstructured_model import train_unstructured_forward_model
+from services.unstructured_build import build_full_dataset
+from models.unstructured_model import train_unstructured_forward_model
 
 def main():
     # 1) 뉴스 받아서 전체 DF 구성 (cluster_0~29 포함)

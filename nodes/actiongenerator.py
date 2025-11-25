@@ -1,5 +1,5 @@
 import json
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 from app.models.llm import llm_json_format
 from app.services.prompt_structure_korean import actiongenerator_prompt

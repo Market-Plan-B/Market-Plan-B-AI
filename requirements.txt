@@ -1,0 +1,49 @@
+# === 데이터 처리 / 통계 ===
+numpy==1.26.4
+pandas==2.3.3
+scipy==1.16.3
+scikit-learn==1.7.2
+statsmodels==0.14.5
+numba==0.62.1
+frozendict==2.4.7
+# === 시각화 ===
+matplotlib==3.10.7
+seaborn==0.13.2
+# === ML / 차원축소 ===
+lightgbm==4.6.0
+hdbscan==0.8.40
+umap-learn==0.5.9.post2
+# === 딥러닝 ===
+tensorflow==2.20.0
+keras==3.12.0
+torch==2.9.1
+captum==0.8.0
+# === NLP / LLM ===
+transformers==4.57.2
+tokenizers==0.22.1
+huggingface-hub==0.36.0
+safetensors==0.7.0
+langchain
+langchain-openai
+# === 통신 ===
+requests==2.32.5
+httpx==0.28.1
+# === 금융 데이터 ===
+yfinance==0.2.66
+# === DB ===
+PyMySQL==1.1.2
+# === 환경 변수 ===
+python-dotenv==1.2.1
+# === Jupyter 개발 환경 ===
+jupyter==1.1.1
+jupyterlab==4.5.0
+notebook==7.5.0
+ipykernel==7.1.0
+ipywidgets==8.1.8
+# === OpenAI & Google LLM ===
+openai==2.8.1
+google-genai==1.52.0
+google-generativeai==0.8.5
+google-ai-generativelanguage==0.6.15
+google-api-python-client==2.187.0
+google-auth==2.43.0

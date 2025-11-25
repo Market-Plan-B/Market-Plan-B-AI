@@ -1,9 +1,10 @@
 from app.models.llm import llm_text_format
 from app.services.prompt_structure_korean import reportgenerator_prompt
-from app.services.datafram_save import df, news_json
-from prompt_structure_korean import reportgenerator_prompt
+from app.services.prompt_structure_korean import reportgenerator_prompt
 
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
+
+import json
 
 # == 변수 ==
 
@@ -53,7 +54,7 @@ def reportgenerator(
 
 
     try:
-        response = (template | llm).invoke({
+        response = (template | llm_text_format).invoke({
             "role": reportgenerator_prompt["role"],
             "rules": reportgenerator_prompt["rules"],
             "output_schema": reportgenerator_prompt["output_schema"],

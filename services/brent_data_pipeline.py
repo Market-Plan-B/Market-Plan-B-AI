@@ -73,9 +73,9 @@ def build_full_dataset(
     start="2013-09-01",
     end=None,
     target_horizon=5,
-    umap_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\umap_64to20.model",
-    kmeans_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\kmeans_20d_30clusters.model",
-    hdbscan_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\hdbscan_20d.model",
+    umap_path=r"app\repository\structured_params\model_weight\umap_64to20.model",
+    kmeans_path=r"app\repository\structured_params\model_weight\kmeans_20d_30clusters.model",
+    hdbscan_path=r"app\repository\structured_params\model_weight\hdbscan_20d.model",
     max_cluster=30     # KMeans n_clusters
 ):
     """
