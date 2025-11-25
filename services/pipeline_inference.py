@@ -5,8 +5,8 @@ import torch
 from captum.attr import IntegratedGradients
 import joblib
 
-from brent_data_pipeline import build_full_dataset
-from bigru_model import BiGRU   
+from app.services.brent_data_pipeline import build_full_dataset
+from app.models.bigru_model import BiGRU   
 
 # --------------------------------------------------
 # 1) GRU 예측 + 가격 복원
@@ -69,25 +69,26 @@ def explain_gru_prediction_ig(model, X_sample, feature_names):
 
 def run_inference(
     news_list,
-    model_path="model_weight/bigru_ret5d.pth",
-    scaler_path="model_weight/scaler.pkl",
+    df,
+    model_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\bigru_brent_ret5d.pth",
+    scaler_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\scaler_brent_ret5d.pkl",
     seq_len=30,
     target_horizon=5,
-    save_path="prediction_output.json"
+    save_path="app/repository/data/prediction_output.json"
 ):
 
-    # ------------------------
-    # (1) 데이터 생성
-    # ------------------------
-    df = build_full_dataset(
-        news=news_list,
-        start="2013-09-01",
-        end=None,               # 오늘까지 자동
-        target_horizon=target_horizon,
-        umap_path="model_weight/umap_64to20.model",
-        kmeans_path="model_weight/kmeans_20d_30clusters.model",
-        hdbscan_path="model_weight/hdbscan_20d.model"
-    )
+    # # ------------------------
+    # # (1) 데이터 생성
+    # # ------------------------
+    # df = build_full_dataset(
+    #     news=news_list,
+    #     start="2013-09-01",
+    #     end=None,               # 오늘까지 자동
+    #     target_horizon=target_horizon,
+    #     umap_path="model_weight/umap_64to20.model",
+    #     kmeans_path="model_weight/kmeans_20d_30clusters.model",
+    #     hdbscan_path="model_weight/hdbscan_20d.model"
+    # )
 
     # ------------------------
     # (2) scaler 로드

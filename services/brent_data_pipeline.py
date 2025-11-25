@@ -19,13 +19,13 @@ def make_brent_wti_features(start="2013-09-01", end=None, target_horizon=1):
     df["brent_wti_spread"] = df["brent_close"] - df["wti_close"]
 
     # Returns (미래 정보 포함 가능성 있음 → 뒤에서 필터링)
-    df["brent_ret_1d"]  = df["brent_close"].pct_change(1)
-    df["brent_ret_5d"]  = df["brent_close"].pct_change(5)
-    df["brent_ret_20d"] = df["brent_close"].pct_change(20)
+    # df["brent_ret_1d"]  = df["brent_close"].pct_change(1)
+    # df["brent_ret_5d"]  = df["brent_close"].pct_change(5)
+    # df["brent_ret_20d"] = df["brent_close"].pct_change(20)
 
-    df["wti_ret_1d"]  = df["wti_close"].pct_change(1)
-    df["wti_ret_5d"]  = df["wti_close"].pct_change(5)
-    df["wti_ret_20d"] = df["wti_close"].pct_change(20)
+    # df["wti_ret_1d"]  = df["wti_close"].pct_change(1)
+    # df["wti_ret_5d"]  = df["wti_close"].pct_change(5)
+    # df["wti_ret_20d"] = df["wti_close"].pct_change(20)
 
     # Moving averages
     df["brent_ma_5"]  = df["brent_close"].rolling(5).mean()
@@ -73,9 +73,9 @@ def build_full_dataset(
     start="2013-09-01",
     end=None,
     target_horizon=5,
-    umap_path="model_weight/umap_64to20.model",
-    kmeans_path="model_weight/kmeans_20d_30clusters.model",
-    hdbscan_path="model_weight/hdbscan_20d.model",
+    umap_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\umap_64to20.model",
+    kmeans_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\kmeans_20d_30clusters.model",
+    hdbscan_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\hdbscan_20d.model",
     max_cluster=30     # KMeans n_clusters
 ):
     """
@@ -130,12 +130,18 @@ def build_full_dataset(
     # -----------------------------------------
     # 6. 날짜 단위로 집계
     # -----------------------------------------
-    # KMeans count (원핫)
-    dummies = pd.get_dummies(news_df["cluster_km"], prefix="cluster")
+    # 1) 우선 원핫 생성 (실제로 등장한 클러스터만)
+    dummies = pd.get_dummies(news_df["cluster_km"])  # prefix 제거
 
+    # 2) 0 ~ max_cluster-1 까지 강제로 전체 클러스터 컬럼 생성
+    dummies = dummies.reindex(columns=range(max_cluster), fill_value=0)
+
+    # 3) 컬럼 이름을 cluster_0 ~ cluster_{N-1} 로 변환
+    dummies.columns = [f"cluster_{i}" for i in range(max_cluster)]
+
+    # 4) 날짜 넣고 groupby
     news_df_with_dummies = pd.concat([news_df[["date"]], dummies], axis=1)
 
-    # 날짜 단위 집계 (sum = count)
     daily_cluster = news_df_with_dummies.groupby("date").sum()
 
     # -----------------------------------------
