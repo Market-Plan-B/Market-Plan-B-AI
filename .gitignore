@@ -8,6 +8,7 @@ __pycache__/
 *.pyo
 *.pyd
 *.pkl
+*.zip
 
 # 📦 IDE / Editor
 .vscode/
