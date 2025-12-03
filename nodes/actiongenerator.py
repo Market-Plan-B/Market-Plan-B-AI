@@ -1,8 +1,8 @@
 import json
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
-from app.models.llm import llm_json_format
-from app.services.prompt_structure_korean import actiongenerator_prompt
+from models.llm import llm_json_format
+from services.prompt_structure_korean import actiongenerator_prompt
 
 
 # == 변수 ==
@@ -27,29 +27,24 @@ def actiongenerator(date, structured_data, model_prediction, xai_result, unstruc
         role=actiongenerator_prompt["role"],
         rules=actiongenerator_prompt["rules"],
         output_schema=actiongenerator_prompt["output_schema"],
-        fewshot=actiongenerator_prompt["fewshot"],
-
         report_date=date,
         structured_data=structured_str,
         news_items=news_str,
         model_prediction=model_pred_str,
         xai_result=xai_str,
     )
-
+    print(final_prompt)
     try:
         response = (template | llm_json_format).invoke({
             "role": actiongenerator_prompt["role"],
             "rules": actiongenerator_prompt["rules"],
             "output_schema": actiongenerator_prompt["output_schema"],
-            "fewshot": actiongenerator_prompt["fewshot"],
-
             "report_date": date,
             "structured_data": structured_str,
             "news_items": news_str,
             "model_prediction": model_pred_str,
             "xai_result": xai_str,
         })
-
 
         return response.content
 

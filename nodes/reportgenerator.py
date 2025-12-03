@@ -1,9 +1,11 @@
-from app.models.llm import llm_text_format
-from app.services.prompt_structure_korean import reportgenerator_prompt
-from app.services.datafram_save import df, news_json
-from prompt_structure_korean import reportgenerator_prompt
+#from services.datafram_save import df, news_json
+#from prompt_structure_korean import reportgenerator_prompt
 
-from langchain.prompts import PromptTemplate
+import json
+from langchain_core.prompts import PromptTemplate
+
+from models.llm import llm_text_format
+from services.prompt_structure_korean import reportgenerator_prompt
 
 # == 변수 ==
 
@@ -40,7 +42,6 @@ def reportgenerator(
         role=reportgenerator_prompt["role"],
         rules=reportgenerator_prompt["rules"],
         output_schema=reportgenerator_prompt["output_schema"],
-        fewshot=reportgenerator_prompt["fewshot"],
 
         report_date=date,
         structured_data=structured_str,
@@ -49,15 +50,14 @@ def reportgenerator(
         xai_result=xai_str,
         precomputed_strategies=strategies_str
     )
+
     print(final_prompt)
 
-
     try:
-        response = (template | llm).invoke({
+        response = (template | llm_text_format).invoke({
             "role": reportgenerator_prompt["role"],
             "rules": reportgenerator_prompt["rules"],
             "output_schema": reportgenerator_prompt["output_schema"],
-            "fewshot": reportgenerator_prompt["fewshot"],
 
             "report_date": date,
             "structured_data": structured_str,
