@@ -1,8 +1,8 @@
 # == 라이브러리 ==
 
-from app.state import State
-from app.tools.datareader import datareader
-from app.tools.graphdrawer import graphdrawer
+from state import State
+from tools.datareader import datareader
+from tools.graphdrawer import graphdrawer
 
 
 # == 전역 변수 ==

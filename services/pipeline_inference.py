@@ -71,8 +71,8 @@ def explain_gru_prediction_ig(model, X_sample, feature_names):
 def run_inference(
     news_list,
     df,
-    model_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\bigru_brent_ret5d.pth",
-    scaler_path=r"D:\skax\project_skala\app\repository\structured_params\model_weight\scaler_brent_ret5d.pkl",
+    model_path=r"app\repository\structured_params\model_weight\bigru_brent_ret5d.pth",
+    scaler_path=r"app\repository\structured_params\model_weight\scaler_brent_ret5d.pkl",
     seq_len=30,
     target_horizon=5,
     save_path="app/repository/data/prediction_output.json"

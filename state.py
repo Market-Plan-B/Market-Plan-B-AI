@@ -2,7 +2,7 @@
 from typing import Any,TypedDict, Annotated, Literal
 from langgraph.graph import add_messages
 
-from app.models.llm import llm
+from models.llm import llm
 
 
 # == 변수 정의 ==

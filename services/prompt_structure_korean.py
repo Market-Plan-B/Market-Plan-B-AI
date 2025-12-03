@@ -429,11 +429,18 @@ reportgenerator_chainofThought = """
 reportgenerator_OutputSchema = """
 [출력 형식(HTML)]
 
+<<<<<<< HEAD
 - 하나의 **완전한 HTML 문서**만 출력하십시오.
 - Executive Summary는 원래처럼 길고 상세히 작성하되,
   그 위에 Today Checklist를 표 형태로 반드시 배치합니다.
 - Recommended Actions는 반드시 각 전략을 표(table)로 출력합니다.
 - 결론 섹션에는 Today Checklist를 다시 넣지 않습니다.
+=======
+- 전체 출력은 하나의 **완전한 HTML 문서**여야 합니다.
+- ```가 출력되지 않아야 합니다.
+
+예시 구조(스켈레톤):
+>>>>>>> 98ef5fac58b3e00673a542a6c584e32a32042922
 
 <!DOCTYPE html>
 <html lang="ko">

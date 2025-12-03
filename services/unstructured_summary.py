@@ -239,8 +239,10 @@ input_dim = 768
 target_dim = 64
 np.random.seed(42)
 projection_matrix = np.random.randn(input_dim, target_dim)  # (768, 64)
+
 def reduce_to_64dim(vec768):
     return np.dot(vec768, projection_matrix)
+
 def generate_summary_embeddings(articles, tokenizer, model, output_file):
     embeddings_768 = []
     valid_indices = []

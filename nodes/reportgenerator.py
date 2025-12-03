@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #from services.datafram_save import df, news_json
 #from prompt_structure_korean import reportgenerator_prompt
 
@@ -6,6 +7,15 @@ from langchain_core.prompts import PromptTemplate
 
 from models.llm import llm_text_format
 from services.prompt_structure_korean import reportgenerator_prompt
+=======
+from app.models.llm import llm_text_format
+from app.services.prompt_structure_korean import reportgenerator_prompt
+from app.services.prompt_structure_korean import reportgenerator_prompt
+
+from langchain_core.prompts import PromptTemplate
+
+import json
+>>>>>>> 98ef5fac58b3e00673a542a6c584e32a32042922
 
 # == 변수 ==
 

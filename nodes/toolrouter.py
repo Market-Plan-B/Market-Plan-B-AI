@@ -1,8 +1,8 @@
 # == 라이브러리 ==
 
-from app.state import State
-from app.models.llm import llm
-from app.services.prompt_structure import toolrouter_prompt
+from state import State
+from models.llm import llm
+from services.prompt_structure import toolrouter_prompt
 
 # == 전역 변수 ==
 

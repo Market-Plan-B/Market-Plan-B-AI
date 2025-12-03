@@ -12,7 +12,6 @@ from sklearn.preprocessing import StandardScaler
 REPO_DIR = "app/repository/unstructured_params"
 PARAM_PATTERN = "unstructure_model_tensor_fwd_*.npz"
 
-
 # =========================
 # 내부 유틸 (학습용)
 # =========================
@@ -117,7 +116,9 @@ def load_latest_forward_params(
     repo_dir에서 unstructure_model_tensor_fwd_*.npz 중
     가장 최신 파일을 골라 A_forward, cluster_cols, H, path, target_col 반환.
     """
+    print(repo_dir)
     pattern = os.path.join(repo_dir, PARAM_PATTERN)
+    print(pattern)
     candidates = sorted(glob.glob(pattern))
     if not candidates:
         raise FileNotFoundError(f"{pattern} 패턴에 맞는 파일이 없습니다.")
