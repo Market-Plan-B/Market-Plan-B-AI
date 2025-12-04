@@ -5,8 +5,8 @@ import torch
 from captum.attr import IntegratedGradients
 import joblib
 
-from app.services.brent_data_pipeline import build_full_dataset
-from app.models.bigru_model import BiGRU   
+from services.brent_data_pipeline import build_full_dataset
+from models.bigru_model import BiGRU   
 
 # --------------------------------------------------
 # 1) GRU 예측 + 가격 복원

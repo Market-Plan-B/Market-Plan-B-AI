@@ -1,7 +1,23 @@
-from app.services.brent_data_pipeline import build_full_dataset
-from app.services.unstructured_refine import unstructure_refine
-from app.services.pipeline_inference import run_inference
-from app.services.unstructured_summary import daily_news_data
+from services.brent_data_pipeline import build_full_dataset
+from services.unstructured_refine import unstructure_refine
+from services.pipeline_inference import run_inference
+from services.unstructured_summary import daily_news_data
+from services.card2 import generate_top5_cards
+import json
+
+
+
+# ===============================================================================================
+# ===============================Card 생성======================================================
+# ===============================================================================================
+with open('data/extra_embedded (1).json', 'r', encoding='utf-8') as f:
+    unstructured_data = json.load(f)
+result = generate_top5_cards(
+    unstructured_data,
+    output_dir="./"
+)
+print(result["card_images"])
+
 
 def db_load():
     """
@@ -43,11 +59,14 @@ def daily_modeling(news_list):
     }
 
     """
-    df = build_full_dataset(news = news_list)
-    print(df.head())
-    df_refine = unstructure_refine(df)
+    print("STEP 1: Building dataset (raw + cluster)...")
+    df0 = build_full_dataset(news=news_list)
 
-    output = run_inference(news_list= news_list, df = df_refine)
+    print("STEP 2: Refining dataset (news impact)...")
+    df1 = unstructure_refine(df0)
+
+    print("STEP 3: Running inference...")
+    output = run_inference(news_list=news_list, df=df1)
 
     return output
 
@@ -58,113 +77,113 @@ date = "2025-11-18"
 
 
 result = daily_modeling(news_list)
-
+ 
 
 # ===============================================================================================
 # ============================================ 대응책 ============================================
 # ===============================================================================================
 
-# from nodes.actiongenerator import actiongenerator
-# from nodes.reportgenerator import reportgenerator
-# from datetime import datetime, timedelta
-# import pandas as pd
-# import json
-# from dotenv import load_dotenv
+from nodes.actiongenerator import actiongenerator
+from nodes.reportgenerator import reportgenerator
+from datetime import datetime, timedelta
+import pandas as pd
+import json
+from dotenv import load_dotenv
 
-# def build_compact_news_list(unstructured_data, max_news=5):
-#     compact_list = []
+def build_compact_news_list(unstructured_data, max_news=5):
+    compact_list = []
 
-#     for idx, item in enumerate(unstructured_data[:max_news], start=1):
-#         title = item.get('title', 'N/A')
-#         summary = item.get('summary', 'N/A')
-#         sentiment = item.get('sentiment', {}).get('score', 'N/A')
-#         trust = item.get('trust', {}).get('score', 'N/A')
+    for idx, item in enumerate(unstructured_data[:max_news], start=1):
+        title = item.get('title', 'N/A')
+        summary = item.get('summary', 'N/A')
+        sentiment = item.get('sentiment', {}).get('score', 'N/A')
+        trust = item.get('trust', {}).get('score', 'N/A')
 
-#         compact = (
-#             f'[뉴스 {idx}] '
-#             f'제목: {title} | '
-#             f'요약: {summary} | '
-#             f'영향도: {sentiment} | '
-#             f'신뢰도: {trust} | '
-#             f'본문 일부: {item.get("content")[:600]}'
-#         )
+        compact = (
+            f'[뉴스 {idx}] '
+            f'제목: {title} | '
+            f'요약: {summary} | '
+            f'영향도: {sentiment} | '
+            f'신뢰도: {trust} | '
+            f'본문 일부: {item.get("content")[:600]}'
+        )
 
-#         compact_list.append(compact)
-#     compact_list = "\n".join(compact_list)
-#     return compact_list
-
-
-# # 대응책 날짜 설정해야됨
-# date = '2025-11-19'
-
-# d = datetime.strptime(date, "%Y-%m-%d")
-# prev_date = d - timedelta(days=1)
-
-# date_str = d.strftime("%Y-%m-%d")
-# prev_date_str = prev_date.strftime("%Y-%m-%d")
-
-# # 그래서 오늘 어제꺼만 들어감 
-# structured_data = pd.read_csv('data/llm_input_sample.csv') ## 여기에 모델 추론에 들어가는 데이터 데려오면 됨
-# filtered = structured_data[
-#     structured_data["Date"].isin([date_str, prev_date_str])
-# ]
-
-# # 여기는 모델이 추론한 값 + xai 값 데려와야댐
-# with open('data/prediction_2025_11_19.json', 'r', encoding='utf-8') as f:
-#     xai_result=json.load(f)
-
-# model_prediction=xai_result['prediction']
-# xai=xai_result['xai']
-
-# # 얜 오늘 뉴스 들어온거 summary 된 것
-# with open('data/extra_embedded (1).json', 'r', encoding='utf-8') as f:
-#     unstructured_data = json.load(f)
-
-# news = build_compact_news_list(unstructured_data, max_news=5)
-
-# action=actiongenerator(date=date,
-#                        structured_data=filtered, 
-#                        model_prediction=model_prediction, 
-#                        xai_result=xai, 
-#                        unstructured_data=news)
-
-# print(action)
-# parsed_json = json.loads(action)
+        compact_list.append(compact)
+    compact_list = "\n".join(compact_list)
+    return compact_list
 
 
-# # 대응책 저장
-# with open("action_output.json", "w", encoding="utf-8") as f:
-#     json.dump(parsed_json, f, ensure_ascii=False, indent=2)
+# 대응책 날짜 설정해야됨
+date = '2025-11-19'
+
+d = datetime.strptime(date, "%Y-%m-%d")
+prev_date = d - timedelta(days=1)
+
+date_str = d.strftime("%Y-%m-%d")
+prev_date_str = prev_date.strftime("%Y-%m-%d")
+
+# 그래서 오늘 어제꺼만 들어감 
+structured_data = pd.read_csv('data/llm_input_sample.csv') ## 여기에 모델 추론에 들어가는 데이터 데려오면 됨
+filtered = structured_data[
+    structured_data["Date"].isin([date_str, prev_date_str])
+]
+
+# 여기는 모델이 추론한 값 + xai 값 데려와야댐
+with open('data/prediction_2025_11_19.json', 'r', encoding='utf-8') as f:
+    xai_result=json.load(f)
+
+model_prediction=xai_result['prediction']
+xai=xai_result['xai']
+
+# 얜 오늘 뉴스 들어온거 summary 된 것
+with open('data/extra_embedded (1).json', 'r', encoding='utf-8') as f:
+    unstructured_data = json.load(f)
+
+news = build_compact_news_list(unstructured_data, max_news=5)
+
+action=actiongenerator(date=date,
+                       structured_data=filtered, 
+                       model_prediction=model_prediction, 
+                       xai_result=xai, 
+                       unstructured_data=news)
+
+print(action)
+parsed_json = json.loads(action)
+
+
+# 대응책 저장
+with open("action_output.json", "w", encoding="utf-8") as f:
+    json.dump(parsed_json, f, ensure_ascii=False, indent=2)
 
 # # ===============================================================================================
 # # ======================================== daily report =========================================
 # # ===============================================================================================
 
-# # #위에꺼 + 대응책 넣어주는 것임
-# minimal_strategies = {
-#     "strategies": [
-#         {
-#             "name": s["name"],
-#             "horizon": s["horizon"],
-#             "objective": s["objective"],
-#             "actions": s["actions"],
-#             "data_evidence": s["data_evidence"],
-#             "risk_note": s["risk_note"],
-#         }
-#         for s in action["strategies"]
-#     ]
-# }
+# #위에꺼 + 대응책 넣어주는 것임
+minimal_strategies = {
+    "strategies": [
+        {
+            "name": s["name"],
+            "horizon": s["horizon"],
+            "objective": s["objective"],
+            "actions": s["actions"],
+            "data_evidence": s["data_evidence"],
+            "risk_note": s["risk_note"],
+        }
+        for s in action["strategies"]
+    ]
+}
 
-# minimal_strategies_str = json.dumps(minimal_strategies, ensure_ascii=False, indent=2)
+minimal_strategies_str = json.dumps(minimal_strategies, ensure_ascii=False, indent=2)
 
-# report = reportgenerator(
-#     date=date,
-#     structured_data=filtered,
-#     model_prediction=model_prediction,
-#     xai_result=xai,
-#     unstructured_data=news,
-#     precomputed_strategies=minimal_strategies_str
-# )
-# print(report)
-# with open("daily_report.html", "w", encoding="utf-8") as f:
-#     f.write(report)
+report = reportgenerator(
+    date=date,
+    structured_data=filtered,
+    model_prediction=model_prediction,
+    xai_result=xai,
+    unstructured_data=news,
+    precomputed_strategies=minimal_strategies_str
+)
+print(report)
+with open("daily_report.html", "w", encoding="utf-8") as f:
+    f.write(report)
